@@ -1,17 +1,10 @@
-import express from "express";
-import cors from "cors";
+import app from "./app";
 import dotenv from "dotenv";
-import webhookRoutes from "./routes/webhook.routes";
 
 dotenv.config();
 
-const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
-
-app.use("/", webhookRoutes);
-
-app.listen(process.env.PORT, () => {
-  console.log("Server running");
+app.listen(PORT, () => {
+  console.log(`Server running on ${PORT}`);
 });

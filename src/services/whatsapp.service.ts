@@ -1,14 +1,16 @@
-import { pool } from "../db/neon";
+import { pool } from "../config/neon";
 
-export const saveMessage = async (payload: any) => {
+export const handleIncomingMessage = async (payload: any) => {
 
   const entry = payload.entry?.[0];
   const changes = entry?.changes?.[0];
   const message = changes?.value?.messages?.[0];
 
-  if (!message) return;
+  if (!message) {
+    return;
+  }
 
-  const text = message.text?.body;
+  const text = message.text?.body || "";
   const from = message.from;
   const waId = message.id;
 
@@ -16,7 +18,6 @@ export const saveMessage = async (payload: any) => {
     `INSERT INTO whatsapp_messages
      (wa_message_id, from_number, message, raw_payload)
      VALUES ($1, $2, $3, $4)`,
-
     [waId, from, text, payload]
   );
 };
