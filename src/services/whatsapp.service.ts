@@ -10,6 +10,12 @@ export const handleIncomingMessage = async (payload: any) => {
     return;
   }
 
+
+
+
+
+
+  
   const text = message.text?.body || "";
   const from = message.from;
   const waId = message.id;
