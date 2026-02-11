@@ -1,1 +1,2 @@
-updating wharsapp
+This project uses Sequelize with TypeScript to define strongly-typed PostgreSQL models and automatically synchronize them with the database.
+Job listings are stored with indexed fields, constraints, and UUID primary keys for safe, scalable ingestion from multiple sources. 
