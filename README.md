@@ -1,41 +1,41 @@
-OmniVision Platform
-===================
+Project OmniVision
+==================
 
-This system aggregates employment opportunities.
-Data is managed with Sequelize ORM and Postgres DB.
+This application collects job postings from multiple sources.
+It stores structured data using Sequelize and PostgreSQL.
 
-System Design
+Architecture Overview
 
-Backend uses Express with TypeScript stack.
-GraphQL layer will be added later.
+The backend is written in Node.js with TypeScript.
+REST APIs expose job data to the frontend dashboard.
 
-Main Capabilities
+Core Features
 
-- Scraping from external providers  
-- Schema with relations  
-- Prevention of duplicate entries  
-- Cron based processors  
+- Automated scraping of job portals  
+- Normalized database schema  
+- Duplicate detection using source id  
+- Scheduled background workers  
 
-Setup Guide
+Installation Steps
 
-1. Download the codebase  
-2. Execute npm install  
-3. Configure environment file  
-4. Launch the server  
+1. Clone the repository  
+2. Run npm install  
+3. Create .env file  
+4. Start development server  
 
-Configuration
+Environment Variables
 
-DATABASE_URL : database string  
-APP_PORT : service port  
-LOG_MODE : verbose or silent  
+DATABASE_URL – connection string  
+PORT – application port  
+LOG_LEVEL – debug or info  
 
-Collaboration Rules
+Team Guidelines
 
-Use meaningful commit messages.
-Do not ignore eslint warnings.
+Write clean commit messages.
+Follow eslint rules strictly.
 
-Planned Improvements
+Future Roadmap
 
-Implement auth module  
-Add redis cache  
-Create reporting UI  
+Add authentication module  
+Introduce caching layer  
+Build analytics dashboard  
