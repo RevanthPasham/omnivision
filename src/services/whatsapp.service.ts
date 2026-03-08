@@ -109,85 +109,105 @@ async function uploadMediaToWhatsApp(buffer: Buffer, filename: string, token: st
  * Handle incoming WhatsApp message and execute commands
  */
 export async function handleIncomingMessage(body: any): Promise<void> {
-  const change = body?.entry?.[0]?.changes?.[0]?.value;
-
-  if (!change) {
-    console.log("No change object");
-    return;
-  }
-
-  // Ignore delivery/read status events
-  if (change.statuses) {
-    console.log("Status update — skipping");
-    return;
-  }
-
-  const msg = change.messages?.[0];
-
-  if (!msg) {
-    console.log("No message object");
-    return;
-  }
-
-  const waMessageId = msg.id ?? null;
-  const fromNumber = msg.from ?? null;
-  const type = msg.type ?? "unknown";
-
-  let messageText: string | null = null;
-
-  if (type === "text") messageText = msg.text?.body ?? null;
-  if (type === "button") messageText = msg.button?.text ?? null;
-  if (type === "interactive") messageText = msg.interactive?.button_reply?.title ?? null;
-
-  console.log("Parsed message:", { waMessageId, fromNumber, type, messageText });
-
-  if (!fromNumber || !messageText) {
-    console.log("Message empty — not processing");
-    return;
-  }
-
   try {
-    // Save the entire raw payload as JSONB
-    const rawPayload = JSON.stringify(body);
+    console.log("📨 [MESSAGE] Processing incoming message...");
+    
+    const change = body?.entry?.[0]?.changes?.[0]?.value;
 
-    await pool.query(
-      `INSERT INTO whatsapp_messages(wa_message_id, from_number, message, raw_payload)
-       VALUES ($1, $2, $3, $4::jsonb)
-       ON CONFLICT DO NOTHING`,
-      [waMessageId, fromNumber, messageText, rawPayload]
-    );
-
-    console.log(`✅ Message saved to DB`);
-
-    // Parse and process command
-    const parsed = parseMessage(messageText);
-    if (!parsed) {
-      await sendWhatsAppMessage(
-        fromNumber,
-        "❌ Invalid command format.\n\nAvailable commands:\n• add_product\n• update_product\n• delete_product\n• report_top_products\n• report_low_products\n• export_sales_excel"
-      );
+    if (!change) {
+      console.log("⚠️ [MESSAGE] No change object in webhook payload");
       return;
     }
 
-    // Validate command
-    const validation = validateCommand(parsed);
-    if (!validation.valid) {
-      await sendWhatsAppMessage(fromNumber, `❌ ${validation.error}`);
+    // Ignore delivery/read status events
+    if (change.statuses) {
+      console.log("ℹ️ [MESSAGE] Status update — skipping");
       return;
     }
 
-    // Execute command
-    await executeCommand(parsed, fromNumber);
-  } catch (err: any) {
-    console.error("❌ Error processing message:", err.message);
+    const msg = change.messages?.[0];
+
+    if (!msg) {
+      console.log("⚠️ [MESSAGE] No message object in change");
+      return;
+    }
+
+    const waMessageId = msg.id ?? null;
+    const fromNumber = msg.from ?? null;
+    const type = msg.type ?? "unknown";
+
+    let messageText: string | null = null;
+
+    if (type === "text") messageText = msg.text?.body ?? null;
+    if (type === "button") messageText = msg.button?.text ?? null;
+    if (type === "interactive") messageText = msg.interactive?.button_reply?.title ?? null;
+
+    console.log("📨 [MESSAGE] Parsed:", { 
+      waMessageId, 
+      fromNumber, 
+      type, 
+      messageText: messageText ? messageText.substring(0, 100) + "..." : null 
+    });
+
+    if (!fromNumber || !messageText) {
+      console.log("⚠️ [MESSAGE] Message empty or missing fromNumber — not processing");
+      return;
+    }
+
     try {
-      await sendWhatsAppMessage(
-        fromNumber,
-        `❌ Error processing your request: ${err.message}\n\nPlease check your command format and try again.`
+      // Save the entire raw payload as JSONB
+      const rawPayload = JSON.stringify(body);
+
+      await pool.query(
+        `INSERT INTO whatsapp_messages(wa_message_id, from_number, message, raw_payload)
+         VALUES ($1, $2, $3, $4::jsonb)
+         ON CONFLICT DO NOTHING`,
+        [waMessageId, fromNumber, messageText, rawPayload]
       );
-    } catch (sendError) {
-      console.error("❌ Failed to send error message:", sendError);
+
+      console.log(`✅ [MESSAGE] Message saved to DB`);
+
+      // Parse and process command
+      const parsed = parseMessage(messageText);
+      if (!parsed) {
+        console.log("❌ [MESSAGE] Invalid message format - message cannot be parsed");
+        console.log("❌ [MESSAGE] Received message:", messageText);
+        await sendWhatsAppMessage(
+          fromNumber,
+          "❌ Invalid message format.\n\nPlease use the correct command format:\n\nExample:\nadd_product\ntitle=Product Name\nslug=product-slug\nprice=100\nstock=10\n\nAvailable commands:\n• add_product\n• update_product\n• delete_product\n• report_top_products\n• report_low_products\n• export_sales_excel"
+        );
+        return;
+      }
+
+      console.log("✅ [MESSAGE] Command parsed:", parsed.command, "Params:", Object.keys(parsed.params));
+
+      // Validate command
+      const validation = validateCommand(parsed);
+      if (!validation.valid) {
+        console.log(`❌ [MESSAGE] Invalid command validation: ${validation.error}`);
+        await sendWhatsAppMessage(fromNumber, `❌ Invalid message: ${validation.error}`);
+        return;
+      }
+
+      // Execute command
+      console.log(`🚀 [MESSAGE] Executing command: ${parsed.command}`);
+      await executeCommand(parsed, fromNumber);
+    } catch (err: any) {
+      console.error("❌ [MESSAGE] Error processing message:", err.message);
+      console.error("❌ [MESSAGE] Error stack:", err.stack);
+      try {
+        await sendWhatsAppMessage(
+          fromNumber,
+          `❌ Error processing your request: ${err.message}\n\nPlease check your command format and try again.`
+        );
+      } catch (sendError: any) {
+        console.error("❌ [MESSAGE] Failed to send error message:", sendError.message);
+      }
     }
+  } catch (error: any) {
+    console.error("❌ [MESSAGE] Fatal error in handleIncomingMessage:", error.message);
+    console.error("❌ [MESSAGE] Error stack:", error.stack);
+    throw error;
   }
 }
 
@@ -243,15 +263,20 @@ async function handleAddProduct(params: Record<string, string>, fromNumber: stri
     material: params.material,
     price: parseFloat(params.price),
     stock: parseInt(params.stock, 10),
+    imageUrl: params.image_url || params.imageurl || params.image,
   });
 
-  const message = `✅ *Product Added Successfully*\n\n` +
+  let message = `✅ *Product Added Successfully*\n\n` +
     `Title: ${product.title}\n` +
     `Slug: ${product.slug}\n` +
     `Brand: ${product.brand || "N/A"}\n` +
     `Material: ${product.material || "N/A"}\n` +
     `Price: ₹${product.price.toFixed(2)}\n` +
     `Stock: ${product.stock}`;
+
+  if (params.image_url || params.imageurl || params.image) {
+    message += `\nImage: ${params.image_url || params.imageurl || params.image}`;
+  }
 
   await sendWhatsAppMessage(fromNumber, message);
 }
@@ -270,6 +295,9 @@ async function handleUpdateProduct(params: Record<string, string>, fromNumber: s
   if (params.stock) {
     updateParams.stock = parseInt(params.stock, 10);
   }
+  if (params.image_url || params.imageurl || params.image) {
+    updateParams.imageUrl = params.image_url || params.imageurl || params.image;
+  }
 
   const product = await productService.updateProduct(updateParams);
 
@@ -278,11 +306,15 @@ async function handleUpdateProduct(params: Record<string, string>, fromNumber: s
     return;
   }
 
-  const message = `✅ *Product Updated Successfully*\n\n` +
+  let message = `✅ *Product Updated Successfully*\n\n` +
     `Title: ${product.title}\n` +
     `Slug: ${product.slug}\n` +
     `Price: ₹${product.price.toFixed(2)}\n` +
     `Stock: ${product.stock}`;
+
+  if (params.image_url || params.imageurl || params.image) {
+    message += `\nImage: ${params.image_url || params.imageurl || params.image}`;
+  }
 
   await sendWhatsAppMessage(fromNumber, message);
 }

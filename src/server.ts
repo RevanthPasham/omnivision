@@ -9,6 +9,21 @@ import { initializeDatabase } from "./db/init";
 
 const PORT = process.env.PORT || 3000;
 
+console.log(`\n🌐 ==========================================`);
+console.log(`🌐 Server Configuration:`);
+console.log(`🌐 Port: ${PORT}`);
+console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`🌐 ==========================================\n`);
+
+if (process.env.PORT && parseInt(process.env.PORT) !== 3000) {
+  console.log(`⚠️  WARNING: Server is running on port ${PORT}`);
+  console.log(`⚠️  Make sure ngrok is pointing to port ${PORT}`);
+  console.log(`⚠️  Run: ngrok http ${PORT}\n`);
+} else {
+  console.log(`📡 Make sure ngrok is pointing to port ${PORT}`);
+  console.log(`💡 If using ngrok, run: ngrok http ${PORT}\n`);
+}
+
 // Initialize database and start server
 const startServer = async () => {
   try {

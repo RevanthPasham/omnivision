@@ -2,6 +2,12 @@
 
 A Node.js + TypeScript backend that integrates with WhatsApp Cloud API (Meta) to manage ecommerce products via WhatsApp messages. The system receives WhatsApp messages, interprets them as admin commands, and performs operations on a Neon PostgreSQL database.
 
+## ⚠️ Quick Start
+
+**See [QUICK_START.md](./QUICK_START.md) for common mistakes and correct message format!**
+
+**Important:** Messages must start with the command name (e.g., `add_product`) and use `key=value` format, NOT `Key: value` format.
+
 ## Features
 
 - ✅ WhatsApp webhook integration (Meta Cloud API)
@@ -49,6 +55,8 @@ npm run dev
 
 ### 1. Local Development with ngrok
 
+**📖 See [NGROK_SETUP.md](./NGROK_SETUP.md) for detailed instructions on finding your callback URL!**
+
 1. Start your server:
 ```bash
 npm run dev
@@ -59,7 +67,11 @@ npm run dev
 ngrok http 3000
 ```
 
-3. Copy the HTTPS URL (e.g., `https://abc123.ngrok.io`)
+3. **Find your callback URL:**
+   - Look at ngrok output for: `Forwarding https://xxx.ngrok-free.app -> http://localhost:3000`
+   - Or open ngrok dashboard: http://127.0.0.1:4040
+   - Copy the HTTPS URL (e.g., `https://abc123.ngrok-free.app`)
+   - **Add `/webhook` at the end:** `https://abc123.ngrok-free.app/webhook`
 
 ### 2. Configure Meta Developer Console
 
@@ -129,6 +141,8 @@ All commands are case-insensitive. Use newlines to separate command and paramete
 
 ### 1. Add Product
 
+**⚠️ IMPORTANT:** The first line MUST be the command name (`add_product`), then use `key=value` format (NOT `Key: value`)
+
 **Format:**
 ```
 add_product
@@ -138,9 +152,10 @@ brand=<brand-name>
 material=<material>
 price=<price>
 stock=<stock-quantity>
+image_url=<image-url>
 ```
 
-**Example:**
+**Example (Copy this exact format):**
 ```
 add_product
 title=Cotton T-Shirt
@@ -149,6 +164,22 @@ brand=Nike
 material=Cotton
 price=599.99
 stock=50
+image_url=https://example.com/image.jpg
+```
+
+**❌ WRONG Format (Don't do this):**
+```
+Title: Cotton T-Shirt
+Slug: cotton-tshirt
+Price: ₹599.99
+```
+
+**✅ CORRECT Format:**
+```
+add_product
+title=Cotton T-Shirt
+slug=cotton-tshirt
+price=599.99
 ```
 
 **Required Fields:**
@@ -160,6 +191,7 @@ stock=50
 **Optional Fields:**
 - `brand` - Brand name
 - `material` - Material type
+- `image_url` - Product image URL (can also use `imageurl` or `image`)
 
 **Response:**
 ```
@@ -171,6 +203,7 @@ Brand: Nike
 Material: Cotton
 Price: ₹599.99
 Stock: 50
+Image: https://example.com/image.jpg
 ```
 
 ---
@@ -192,13 +225,22 @@ slug=<product-slug>
 stock=<new-stock>
 ```
 
-or both:
+or
+
+```
+update_product
+slug=<product-slug>
+image_url=<new-image-url>
+```
+
+or any combination:
 
 ```
 update_product
 slug=<product-slug>
 price=<new-price>
 stock=<new-stock>
+image_url=<new-image-url>
 ```
 
 **Example:**
@@ -216,9 +258,22 @@ slug=cotton-tshirt
 stock=75
 ```
 
+or
+
+```
+update_product
+slug=cotton-tshirt
+image_url=https://example.com/new-image.jpg
+```
+
 **Required Fields:**
 - `slug` - Product slug to update
-- At least one of: `price` or `stock`
+- At least one of: `price`, `stock`, or `image_url`
+
+**Optional Fields:**
+- `price` - New product price
+- `stock` - New stock quantity
+- `image_url` - New product image URL (can also use `imageurl` or `image`)
 
 **Response:**
 ```
@@ -228,6 +283,7 @@ Title: Cotton T-Shirt
 Slug: cotton-tshirt
 Price: ₹699.99
 Stock: 75
+Image: https://example.com/new-image.jpg
 ```
 
 ---
@@ -364,6 +420,7 @@ brand=Test Brand
 material=Cotton
 price=999.99
 stock=25
+image_url=https://example.com/test-image.jpg
 ```
 
 ### Test Update Product
@@ -405,12 +462,15 @@ export_sales_excel
 
 The system will send error messages if something goes wrong:
 
-- `❌ Invalid command format.` - Command syntax is incorrect
+- `❌ Invalid message format.` - Message format is incorrect (sends when message can't be parsed)
+- `❌ Invalid message: <error>` - Command validation failed
 - `❌ Missing required parameter: <field>` - Required field is missing
 - `❌ Product with slug "<slug>" already exists.` - Duplicate slug
 - `❌ Product with slug "<slug>" not found.` - Product doesn't exist
 - `❌ Unknown command: <command>` - Command not recognized
 - `❌ Error: <error-message>` - General error with details
+
+**Note:** When you send an invalid message, the system will respond with "❌ Invalid message format" and show available commands.
 
 ---
 
@@ -643,12 +703,53 @@ npm run build
 npm start
 ```
 
+### Console Logging
+
+All operations are logged to the console with detailed information. Watch your backend console to verify operations:
+
+#### Add Product Logs:
+```
+📦 [ADD PRODUCT] Starting product creation: { title, slug, brand, ... }
+✅ [ADD PRODUCT] Product created with ID: <uuid>
+✅ [ADD PRODUCT] Variant created with ID: <uuid>, SKU: <sku>
+✅ [ADD PRODUCT] Image added: <url> (if image provided)
+✅ [ADD PRODUCT] Transaction committed successfully for product: <title> (<slug>)
+```
+
+#### Update Product Logs:
+```
+🔄 [UPDATE PRODUCT] Starting product update: { slug, price, stock, ... }
+✅ [UPDATE PRODUCT] Product found: <title> (ID: <uuid>)
+🔄 [UPDATE PRODUCT] Updating price to: <price>
+🔄 [UPDATE PRODUCT] Updating stock to: <stock>
+✅ [UPDATE PRODUCT] Variant updated successfully
+✅ [UPDATE PRODUCT] Image updated: <url> (if image provided)
+✅ [UPDATE PRODUCT] Transaction committed successfully for product: <slug>
+```
+
+#### Delete Product Logs:
+```
+🗑️ [DELETE PRODUCT] Attempting to delete product with slug: <slug>
+📋 [DELETE PRODUCT] Found product: <title> (ID: <uuid>)
+✅ [DELETE PRODUCT] Product deleted successfully: <title> (<slug>)
+```
+
+#### Error Logs:
+```
+❌ [ADD PRODUCT] Error: <error message>
+❌ [UPDATE PRODUCT] Product with slug "<slug>" not found
+❌ Invalid message format - sending error response
+```
+
 ### Check logs:
 All operations are logged to console with emoji indicators:
 - ✅ Success
 - ❌ Error
 - ⚠️ Warning
 - 📊 Report/Data
+- 📦 Add Product
+- 🔄 Update Product
+- 🗑️ Delete Product
 
 ---
 

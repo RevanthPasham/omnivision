@@ -60,8 +60,8 @@ export function validateCommand(parsed: ParsedCommand): { valid: boolean; error?
 
     case "update_product":
       if (!params.slug) return { valid: false, error: "Missing required parameter: slug" };
-      if (!params.price && !params.stock) {
-        return { valid: false, error: "At least one of price or stock must be provided" };
+      if (!params.price && !params.stock && !params.image_url) {
+        return { valid: false, error: "At least one of price, stock, or image_url must be provided" };
       }
       break;
 
