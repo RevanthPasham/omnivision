@@ -217,28 +217,14 @@ async function handleDeleteProduct(params: Record<string, string>, from: string)
 }
 
 async function handleReportTopProducts(from: string) {
-  const rows = await reportService.getTopSellingProducts(10);
   const excel = await reportService.generateTopSellingExcel(10);
   const filename = `top-selling-${new Date().toISOString().slice(0, 10)}.xlsx`;
-  const summary =
-    rows.length === 0
-      ? "📊 No selling data found yet."
-      : `📊 Top selling report generated.\nTop product: ${rows[0].title}\nSold qty: ${rows[0].soldQuantity}`;
-
-  await sendWhatsAppMessage(from, summary);
   await sendWhatsAppDocument(from, excel, filename, "Top Selling Products Report");
 }
 
 async function handleReportLessProducts(from: string) {
-  const rows = await reportService.getLessSellingProducts(10);
   const excel = await reportService.generateLessSellingExcel(10);
   const filename = `less-selling-${new Date().toISOString().slice(0, 10)}.xlsx`;
-  const summary =
-    rows.length === 0
-      ? "📉 No selling data found yet."
-      : `📉 Less selling report generated.\nLowest product: ${rows[0].title}\nSold qty: ${rows[0].soldQuantity}`;
-
-  await sendWhatsAppMessage(from, summary);
   await sendWhatsAppDocument(from, excel, filename, "Less Selling Products Report");
 }
 
