@@ -11,7 +11,7 @@ export interface ParsedCommand {
  * - update_product\nslug=value\nprice=value
  * - delete_product\nslug=value
  * - report_top_products
- * - report_low_products
+ * - report_low_products / report_less_products
  * - export_sales_excel
  */
 export function parseMessage(message: string): ParsedCommand | null {
@@ -71,6 +71,7 @@ export function validateCommand(parsed: ParsedCommand): { valid: boolean; error?
 
     case "report_top_products":
     case "report_low_products":
+    case "report_less_products":
     case "export_sales_excel":
       // No parameters required
       break;
