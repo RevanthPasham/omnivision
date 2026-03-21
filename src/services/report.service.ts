@@ -17,6 +17,17 @@ export interface LowStockProduct {
   brand: string | null;
 }
 
+export interface SellingProduct {
+  title: string;
+  slug: string;
+  brand: string | null;
+  price: number;
+  stock: number;
+  soldQuantity: number;
+  orderCount: number;
+  revenue: number;
+}
+
 /**
  * Get top products (highest stock quantity)
  */
@@ -178,4 +189,119 @@ export function formatLowStockProducts(products: LowStockProduct[]): string {
   });
 
   return message;
+}
+
+async function fetchSellingProducts(
+  direction: "ASC" | "DESC",
+  limit: number
+): Promise<SellingProduct[]> {
+  try {
+    const result = await pool.query(
+      `SELECT
+         p.title,
+         p.slug,
+         p.brand,
+         COALESCE(MIN(pv.price), 0) AS min_price,
+         COALESCE(SUM(pv.stock_quantity), 0) AS total_stock,
+         COALESCE(SUM(CASE WHEN o.id IS NOT NULL THEN oi.quantity ELSE 0 END), 0) AS sold_quantity,
+         COALESCE(COUNT(DISTINCT CASE WHEN o.id IS NOT NULL THEN o.id END), 0) AS order_count,
+         COALESCE(SUM(CASE WHEN o.id IS NOT NULL THEN oi.subtotal ELSE 0 END), 0) AS revenue
+       FROM products p
+       LEFT JOIN product_variants pv ON pv.product_id = p.id
+       LEFT JOIN order_items oi ON oi.product_id = p.id
+       LEFT JOIN orders o
+         ON o.id = oi.order_id
+         AND COALESCE(o.order_status, '') NOT IN ('Cancelled', 'Canceled', 'Failed')
+       WHERE p.is_active = true
+       GROUP BY p.id, p.title, p.slug, p.brand
+       ORDER BY sold_quantity ${direction}, order_count ${direction}, revenue ${direction}, p.title ASC
+       LIMIT $1`,
+      [limit]
+    );
+
+    return result.rows.map((row) => ({
+      title: row.title,
+      slug: row.slug,
+      brand: row.brand,
+      price: Number(row.min_price),
+      stock: Number(row.total_stock),
+      soldQuantity: Number(row.sold_quantity),
+      orderCount: Number(row.order_count),
+      revenue: Number(row.revenue),
+    }));
+  } catch (error: any) {
+    // Fallback when orders/order_items tables don't exist yet.
+    if (error?.code === "42P01") {
+      const stockRows =
+        direction === "DESC" ? await getTopProducts(limit) : await getLowStockProducts(10);
+      const rows = (direction === "DESC" ? stockRows : stockRows.slice(0, limit)) as Array<
+        TopProduct | LowStockProduct
+      >;
+      return rows.map((p) => ({
+        title: p.title,
+        slug: p.slug,
+        brand: p.brand,
+        price: p.price,
+        stock: p.stock,
+        soldQuantity: 0,
+        orderCount: 0,
+        revenue: 0,
+      }));
+    }
+    throw error;
+  }
+}
+
+export async function getTopSellingProducts(limit: number = 10): Promise<SellingProduct[]> {
+  return fetchSellingProducts("DESC", limit);
+}
+
+export async function getLessSellingProducts(limit: number = 10): Promise<SellingProduct[]> {
+  return fetchSellingProducts("ASC", limit);
+}
+
+export async function generateTopSellingExcel(limit: number = 10): Promise<Buffer> {
+  const rows = await getTopSellingProducts(limit);
+  return generateSellingExcel(rows, "Top Selling Products");
+}
+
+export async function generateLessSellingExcel(limit: number = 10): Promise<Buffer> {
+  const rows = await getLessSellingProducts(limit);
+  return generateSellingExcel(rows, "Less Selling Products");
+}
+
+async function generateSellingExcel(rows: SellingProduct[], sheetName: string): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet(sheetName);
+
+  worksheet.columns = [
+    { header: "Product Name", key: "title", width: 36 },
+    { header: "Slug", key: "slug", width: 28 },
+    { header: "Brand", key: "brand", width: 20 },
+    { header: "Price", key: "price", width: 12 },
+    { header: "Current Stock", key: "stock", width: 14 },
+    { header: "Sold Quantity", key: "soldQuantity", width: 14 },
+    { header: "Orders Count", key: "orderCount", width: 14 },
+    { header: "Revenue", key: "revenue", width: 14 },
+  ];
+
+  worksheet.getRow(1).font = { bold: true };
+  worksheet.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFEFEFEF" },
+  };
+
+  rows.forEach((row) => {
+    worksheet.addRow({
+      ...row,
+      brand: row.brand || "",
+    });
+  });
+
+  worksheet.getColumn("price").numFmt = "#,##0.00";
+  worksheet.getColumn("revenue").numFmt = "#,##0.00";
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
 }
