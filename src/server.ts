@@ -5,7 +5,7 @@ dotenv.config();
 
 import app from "./app";
 import { testConnection } from "./config/neon";
-import { initializeDatabase } from "./db/init";
+import { ensureSchemaOnce } from "./db/ensureSchema";
 
 const PORT = process.env.PORT || 3000;
 
@@ -15,13 +15,15 @@ console.log(`🌐 Port: ${PORT}`);
 console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
 console.log(`🌐 ==========================================\n`);
 
-if (process.env.PORT && parseInt(process.env.PORT) !== 3000) {
-  console.log(`⚠️  WARNING: Server is running on port ${PORT}`);
-  console.log(`⚠️  Make sure ngrok is pointing to port ${PORT}`);
-  console.log(`⚠️  Run: ngrok http ${PORT}\n`);
-} else {
-  console.log(`📡 Make sure ngrok is pointing to port ${PORT}`);
-  console.log(`💡 If using ngrok, run: ngrok http ${PORT}\n`);
+if (!process.env.VERCEL) {
+  if (process.env.PORT && parseInt(process.env.PORT, 10) !== 3000) {
+    console.log(`⚠️  WARNING: Server is running on port ${PORT}`);
+    console.log(`⚠️  Make sure ngrok is pointing to port ${PORT}`);
+    console.log(`⚠️  Run: ngrok http ${PORT}\n`);
+  } else {
+    console.log(`📡 Local dev: point ngrok at port ${PORT} (ngrok http ${PORT})`);
+    console.log(`💡 Production (Vercel): use your deployment URL — ngrok not needed\n`);
+  }
 }
 
 // Initialize database and start server
@@ -32,8 +34,7 @@ const startServer = async () => {
     if (!connected) {
       console.error("⚠️  Server starting but database connection failed. Some features may not work.");
     } else {
-      // Initialize database tables
-      await initializeDatabase();
+      await ensureSchemaOnce();
     }
 
     // Start the server

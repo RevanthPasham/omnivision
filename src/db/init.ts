@@ -1,17 +1,12 @@
 import { pool } from "../config/neon";
 
+/** Idempotent — safe for repeated runs (Vercel cold starts, local restarts). Never drops data. */
 export const initializeDatabase = async (): Promise<void> => {
   try {
-    console.log("Initializing database...");
-    
-    // Drop old table if it exists with different schema
+    console.log("Ensuring database schema...");
+
     await pool.query(`
-      DROP TABLE IF EXISTS whatsapp_messages
-    `);
-    
-    // Create whatsapp_messages table with the correct schema
-    await pool.query(`
-      CREATE TABLE whatsapp_messages (
+      CREATE TABLE IF NOT EXISTS whatsapp_messages (
         id SERIAL PRIMARY KEY,
         wa_message_id VARCHAR(100),
         from_number VARCHAR(30),
@@ -21,25 +16,22 @@ export const initializeDatabase = async (): Promise<void> => {
       )
     `);
 
-    // Create index on from_number for faster queries
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_messages_wa_message_id_unique
+      ON whatsapp_messages (wa_message_id)
+    `);
+
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_from_number 
       ON whatsapp_messages(from_number)
     `);
 
-    // Create index on created_at for faster time-based queries
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_created_at 
       ON whatsapp_messages(created_at)
     `);
 
-    // Create index on wa_message_id for faster lookups
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_wa_message_id 
-      ON whatsapp_messages(wa_message_id)
-    `);
-
-    console.log("✅ Database tables initialized successfully");
+    console.log("✅ Database schema ready");
   } catch (err: any) {
     console.error("❌ Database initialization failed:", err.message);
     throw err;

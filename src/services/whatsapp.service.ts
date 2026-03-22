@@ -1,6 +1,7 @@
 import axios from "axios";
 import FormData from "form-data";
 import { pool } from "../config/neon";
+import { ensureSchemaOnce } from "../db/ensureSchema";
 import { getWhatsAppConfig, getGraphApiUrl } from "../config/whatsapp.config";
 import { parseMessage, validateCommand } from "../utils/messageParser";
 import * as productService from "./product.service";
@@ -113,11 +114,13 @@ export async function handleIncomingMessage(body: any) {
   if (!fromNumber || !messageText) return;
 
   try {
+    await ensureSchemaOnce();
+
     const rawPayload = JSON.stringify(body);
     await pool.query(
       `INSERT INTO whatsapp_messages(wa_message_id, from_number, message, raw_payload)
        VALUES ($1, $2, $3, $4::jsonb)
-       ON CONFLICT DO NOTHING`,
+       ON CONFLICT (wa_message_id) DO NOTHING`,
       [waMessageId, fromNumber, messageText, rawPayload]
     );
 
