@@ -10,6 +10,51 @@ You already have the authtoken command. Run it once:
 ngrok config add-authtoken 39NhmxFivprqNEbae63LXJPO9Jx_6F2gnBpXkiBZNgjPeDSU4
 ```
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 **Expected output:**
 ```
 Authtoken saved to configuration file: C:\Users\rahul\.ngrok2\ngrok.yml
